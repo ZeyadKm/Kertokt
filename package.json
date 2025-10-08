@@ -1,0 +1,9 @@
+{
+  "name": "homellm",
+  "version": "1.0.0",
+  "description": "HomeLLM - email escalation helper and training dataset viewer.",
+  "license": "MIT",
+  "scripts": {
+    "start": "python3 -m http.server 5173"
+  }
+}
