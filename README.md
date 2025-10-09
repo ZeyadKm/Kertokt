@@ -2,12 +2,32 @@
 
 ## Automatic Analysis of Consumer Reports
 
-This project explores how we can help customers automatically analyze a wide
-range of water-quality and household service reports—going beyond the EWG
-reports to include utility company documents, insurance plans, and home
-warranty offers. The goal is to surface actionable insights and recommended
-next steps so that households can make the most of the services they already
-pay for.
+Kertokt now ships with a lightweight application that merges Environmental
+Working Group (EWG) summaries, municipal utility company reports, and household
+coverage benefits into a single actionable briefing. The toolkit ingests JSON
+exports, highlights contaminants that exceed health or legal limits, and pairs
+them with programs or insurance benefits that help customers take action—just
+like a personal DoNotPay for home and health services.
+
+- Run the CLI against the bundled Denver Water sample data:
+
+  ```bash
+  PYTHONPATH=src python -m kertokt.cli --sample
+  ```
+
+- Analyze your own exports by pointing the tool to structured JSON files:
+
+  ```bash
+  PYTHONPATH=src python -m kertokt.cli \
+    --ewg path/to/ewg.json \
+    --utility path/to/utility.json \
+    --coverage path/to/benefits.json
+  ```
+
+The CLI prints consolidated findings and recommendation bulletins that a
+customer success agent (or the household themselves) can follow to request
+tests, claim rebates, and leverage existing insurance perks.
 
 See [docs/automation_plan.md](docs/automation_plan.md) for a deeper look at the
-initial product and technical approach.
+product and technical roadmap. The live toolkit implements the ingestion,
+analysis, and recommendation layers described in that plan.

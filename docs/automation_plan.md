@@ -53,10 +53,18 @@ benefits—similar to how services like DoNotPay streamline consumer advocacy.
      benefit becomes available.
 
 ## Next Steps
-- Build proof-of-concept parsers for a small set of utility reports.
-- Extend the existing EWG ingestion pipeline to the unified schema.
-- Prototype the rules engine to flag high-priority recommendations.
+- Build proof-of-concept parsers for a small set of utility reports. ✅ _See
+  `src/kertokt/ingestion/utility.py` and the bundled sample report._
+- Extend the existing EWG ingestion pipeline to the unified schema. ✅
+- Prototype the rules engine to flag high-priority recommendations. ✅
 - Conduct user testing to validate the usefulness of automated suggestions.
+
+## Prototype Application
+
+The repository includes a runnable CLI (`python -m kertokt.cli`) that wires the
+data ingestion modules, analysis logic, and text summarization into a single
+workflow. Use `--sample` to try the Denver Water dataset or point the CLI to
+your own JSON exports to generate customer-ready briefing notes.
 
 ## Long-Term Vision
 Create a comprehensive consumer advocacy assistant that continuously monitors
