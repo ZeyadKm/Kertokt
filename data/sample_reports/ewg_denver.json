@@ -1,0 +1,22 @@
+{
+  "utility": "Denver Water",
+  "year": 2023,
+  "contaminants": [
+    {
+      "name": "Chromium (hexavalent)",
+      "level_ppb": 0.43,
+      "health_guideline_ppb": 0.02,
+      "legal_limit_ppb": 10.0,
+      "detected_in": "Distribution system",
+      "notes": "Detected in distribution lines with older infrastructure."
+    },
+    {
+      "name": "Haloacetic acids (HAA5)",
+      "level_ppb": 18.2,
+      "health_guideline_ppb": 0.1,
+      "legal_limit_ppb": 60.0,
+      "detected_in": "Finished water",
+      "notes": "Byproduct of disinfection."
+    }
+  ]
+}
