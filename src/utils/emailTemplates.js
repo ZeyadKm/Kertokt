@@ -6,6 +6,7 @@ import {
   stateRegulations,
   federalReferences
 } from '../data/escalationRules.js';
+import { findWaterStandard } from '../data/waterStandards.js';
 
 const fallback = (value, placeholder) => (value && value.trim().length ? value.trim() : placeholder);
 
@@ -22,6 +23,7 @@ export function buildEmail(formData, attachments = []) {
     location,
     city,
     state,
+    concernSummary,
     evidence,
     measurements,
     previousContact,
@@ -35,7 +37,8 @@ export function buildEmail(formData, attachments = []) {
     senderName,
     senderEmail,
     senderPhone,
-    senderAddress
+    senderAddress,
+    waterAnalysis
   } = formData;
 
   const issueData = issueGuidance[issueType] || null;
@@ -55,6 +58,7 @@ export function buildEmail(formData, attachments = []) {
 
   const introLines = [
     `I am writing on behalf of ${fallback(senderName, 'our assessment team')} regarding ${issueData ? issueData.label.toLowerCase() : 'an indoor environmental issue'} at ${fallback(location, 'the property')} in ${[city, state].filter(Boolean).join(', ')}.`,
+    concernSummary,
     escalation.guidance
   ].filter(Boolean);
 
@@ -76,6 +80,16 @@ export function buildEmail(formData, attachments = []) {
   }
   if (attachments.length) {
     evidenceLines.push(`Attachments provided: ${attachments.map((file) => file.name).join(', ')}.`);
+  }
+  if (waterAnalysis && waterAnalysis.entries && waterAnalysis.entries.length) {
+    const highlights = waterAnalysis.exceedances.length
+      ? `Key exceedances: ${waterAnalysis.exceedances
+          .map((entry) => `${entry.parameter} at ${entry.value}${entry.unit ? ` ${entry.unit}` : ''}`)
+          .join('; ')}.`
+      : 'Lab results are within regulatory limits.';
+    evidenceLines.push(
+      `Water quality summary (${waterAnalysis.fileName || 'analysis'}): ${highlights}`
+    );
   }
 
   const regulatoryLines = [];
@@ -128,6 +142,22 @@ export function buildEmail(formData, attachments = []) {
   if (senderEmail) contactLines.push(senderEmail);
   if (senderPhone) contactLines.push(senderPhone);
 
+  const waterDetailSection = [];
+  if (waterAnalysis && waterAnalysis.entries && waterAnalysis.entries.length) {
+    waterDetailSection.push('Water Testing Details:');
+    waterAnalysis.entries.forEach((entry) => {
+      const standard = findWaterStandard(entry.parameter);
+      const comparison =
+        standard && typeof entry.value === 'number'
+          ? entry.value > standard.mcl
+            ? `exceeds the ${standard.thresholdLabel} of ${standard.mcl} ${standard.unit}`
+            : `is below the ${standard.thresholdLabel} of ${standard.mcl} ${standard.unit}`
+          : '';
+      const line = `• ${entry.parameter}: ${entry.value}${entry.unit ? ` ${entry.unit}` : ''}`;
+      waterDetailSection.push(comparison ? `${line} (${comparison}).` : `${line}.`);
+    });
+  }
+
   const bodySections = [
     greeting,
     '',
@@ -135,6 +165,7 @@ export function buildEmail(formData, attachments = []) {
     '',
     evidenceLines.length ? 'Key Findings:\n' + evidenceLines.map((line) => `• ${line}`).join('\n') : '',
     regulatoryLines.length ? 'Regulatory Context:\n' + regulatoryLines.map((line) => `• ${line}`).join('\n') : '',
+    waterDetailSection.length ? waterDetailSection.join('\n') : '',
     actionLines.length ? 'Requested Next Steps:\n' + actionLines.join('\n') : '',
     '',
     ...closingLines,

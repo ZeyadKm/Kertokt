@@ -23,6 +23,16 @@ body {
   padding: 32px 24px 48px;
 }
 
+.layout-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.layout-stack > .panel {
+  margin-bottom: 0;
+}
+
 .header {
   display: flex;
   align-items: center;
@@ -58,6 +68,21 @@ body {
   margin-bottom: 24px;
 }
 
+.panel.highlight {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.02));
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.panel.guidance {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.panel-lede {
+  margin: 0 0 16px;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
 .tab-bar {
   display: flex;
   gap: 8px;
@@ -91,6 +116,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.field.full-width {
+  grid-column: 1 / -1;
 }
 
 .field label {
@@ -130,6 +159,45 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.panel.collapsible details {
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  padding: 16px 20px;
+}
+
+.panel.collapsible summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  list-style: none;
+}
+
+.panel.collapsible summary::-webkit-details-marker {
+  display: none;
+}
+
+.panel.collapsible summary::after {
+  content: '▸';
+  font-size: 0.85rem;
+  color: #64748b;
+  transition: transform 0.2s ease;
+}
+
+.panel.collapsible details[open] summary::after {
+  transform: rotate(90deg);
+}
+
+.details-body {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .button-row {
@@ -210,6 +278,27 @@ body {
   color: #b91c1c;
 }
 
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  background: rgba(148, 163, 184, 0.2);
+  color: #0f172a;
+}
+
+.status-chip.ok {
+  background: rgba(16, 185, 129, 0.18);
+  color: #047857;
+}
+
+.status-chip.alert {
+  background: rgba(248, 113, 113, 0.18);
+  color: #b91c1c;
+}
+
 .generated-email {
   margin-top: 20px;
   display: flex;
@@ -245,6 +334,88 @@ body {
   line-height: 1.4;
   display: block;
   white-space: pre-wrap;
+}
+
+.water-panel {
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(14, 165, 233, 0.02));
+}
+
+.water-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(280px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.water-inputs .button-row {
+  margin-top: 12px;
+}
+
+.water-summary {
+  background: white;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 14px;
+  padding: 16px;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.water-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.water-result-sub {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.water-flags {
+  margin: 0;
+  padding-left: 18px;
+  color: #b91c1c;
+}
+
+.water-flags li {
+  margin-bottom: 4px;
+}
+
+.water-good {
+  margin: 0;
+  color: #047857;
+  font-weight: 600;
+}
+
+.water-placeholder {
+  margin: 0;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.water-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.water-table th,
+.water-table td {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  padding: 10px;
+  text-align: left;
+}
+
+.water-table tr.alert {
+  background: rgba(248, 113, 113, 0.12);
+}
+
+.water-table tr.ok {
+  background: rgba(16, 185, 129, 0.08);
 }
 
 .attachments {
@@ -284,6 +455,10 @@ body {
 
   .panel {
     padding: 20px;
+  }
+
+  .water-layout {
+    grid-template-columns: 1fr;
   }
 }
 
