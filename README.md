@@ -24,6 +24,36 @@ HomeLLM is a lightweight, browser-based workspace that helps indoor environmenta
 3. Click **Generate Email** to create a subject line and body. Copy or download the text for final review and sending.
 4. Switch to the **Training Dataset** tab to review curated prompt/completion examples. These entries illustrate how to cite regulations accurately when automating escalations.
 
+## Deploying to Vercel
+
+HomeLLM is a static site, so Vercel can host it without a custom build step. Follow these detailed instructions:
+
+### 1. Prepare the repository
+
+1. Sign in to [vercel.com](https://vercel.com) (create a free account if needed).
+2. Fork or push this repository to a Git provider that Vercel supports (GitHub, GitLab, or Bitbucket). Make sure the root of the repo includes `index.html`, the `src/` directory, and the provided `vercel.json` file.
+
+### 2. Import the project in Vercel
+
+1. In the Vercel dashboard, click **Add New… → Project** and choose the Git repository that contains HomeLLM.
+2. When the import wizard asks for a framework preset, choose **Other** so Vercel knows it is a plain static site.
+3. Leave the **Build Command** field empty. This tells Vercel no build step is required.
+4. Set **Output Directory** to `.` (a single dot). That instructs Vercel to publish the project root as-is.
+5. Confirm the settings and click **Deploy**. The initial deployment usually finishes in a few seconds because no build is performed.
+
+### 3. Verify the deployment
+
+1. After the deployment completes, Vercel provides a preview URL. Open it to confirm the HomeLLM UI loads.
+2. The included `vercel.json` file adds a catch-all rewrite so every route serves `index.html`. Navigate to a nested route (e.g., `/anything`) to confirm the single-page app still renders.
+3. If you want a custom domain, attach it through **Settings → Domains** and wait for DNS propagation.
+
+### 4. Enable continuous deployment (optional)
+
+1. Merge changes into the default branch of your Git repository.
+2. Each push automatically triggers a fresh deployment. Use Vercel’s **Deployments** tab to monitor build history and roll back if necessary.
+
+If you ever need to trigger a deployment manually, you can also use the [Vercel CLI](https://vercel.com/docs/cli/deploy) from this project root and run `vercel --prod`. The CLI respects the same `vercel.json` configuration that powers dashboard deployments.
+
 ## Project Structure
 
 ```
