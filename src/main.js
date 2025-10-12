@@ -31,6 +31,8 @@ const defaultFormState = {
   senderPhone: '',
   senderAddress: '',
   apiKey: '',
+  apiBaseUrl: '',
+  waterAnalysisUrl: '',
   waterAnalysis: null,
   waterAnalysisRaw: ''
 };
@@ -312,6 +314,26 @@ class HomeLLMApp {
               <p class="panel-lede">Store a model key locally if you trigger custom automations.</p>
               <div class="grid-two">
                 <div class="field">
+                  <label for="apiBaseUrl">API Base URL</label>
+                  <input
+                    id="apiBaseUrl"
+                    name="apiBaseUrl"
+                    placeholder="https://api.example.com"
+                    value="${this.escape(this.state.apiBaseUrl)}"
+                  />
+                  <small>Used to build the water analysis endpoint ("/water-analysis").</small>
+                </div>
+                <div class="field">
+                  <label for="waterAnalysisUrl">Water Analysis Endpoint</label>
+                  <input
+                    id="waterAnalysisUrl"
+                    name="waterAnalysisUrl"
+                    placeholder="https://api.example.com/water-analysis"
+                    value="${this.escape(this.state.waterAnalysisUrl)}"
+                  />
+                  <small>Overrides the base URL when set.</small>
+                </div>
+                <div class="field full-width">
                   <label for="apiKey">Model API Key</label>
                   <input type="password" id="apiKey" name="apiKey" placeholder="Paste provider key (optional)" value="${this.escape(
                     this.state.apiKey
@@ -386,6 +408,8 @@ class HomeLLMApp {
       }
     }
 
+    const configStatus = this.getWaterConfigStatus();
+
     const rows = hasData
       ? analysis.entries
           .map((entry) => {
@@ -421,7 +445,7 @@ class HomeLLMApp {
             )
             .join('')}</ul>`
         : '<p class="water-good">All reported readings are within EPA reference limits.</p>'
-      : '<div class="water-placeholder">Upload or paste readings (CSV, JSON, text, or PDF) to summarize exceedances instantly.</div>';
+      : '<div class="water-placeholder">Upload or paste readings (CSV, JSON, text, or PDF via GPT-5) to summarize exceedances instantly.</div>';
 
     return `
       <div class="panel water-panel">
@@ -432,7 +456,15 @@ class HomeLLMApp {
             <div class="field">
               <label for="waterAnalysisFile">Upload Lab Report (.csv, .txt, .json, .pdf)</label>
               <input id="waterAnalysisFile" type="file" accept=".csv,.txt,.json,.pdf,application/pdf" />
-              <small class="water-input-hint">PDF uploads are interpreted by GPT-5 using your configured API.</small>
+              <small class="water-input-hint">Set the endpoint in Optional API Configuration to enable GPT-5 PDF parsing.</small>
+              <div id="waterConfigStatus" class="water-config ${configStatus.tone}">
+                <span>${this.escape(configStatus.message)}</span>
+                ${
+                  configStatus.endpoint
+                    ? `<span class="water-config-endpoint">Endpoint: ${this.escape(configStatus.endpoint)}</span>`
+                    : ''
+                }
+              </div>
             </div>
             <div class="field">
               <label for="waterAnalysisRaw">Paste table or readings</label>
@@ -581,6 +613,9 @@ class HomeLLMApp {
         if (name in this.state) {
           this.state[name] = value;
         }
+        if (['apiKey', 'apiBaseUrl', 'waterAnalysisUrl'].includes(name)) {
+          this.updateWaterConfigIndicator();
+        }
         if (name === 'issueType') {
           if (value !== 'water-quality') {
             this.state.waterAnalysis = null;
@@ -725,7 +760,7 @@ class HomeLLMApp {
 
     const endpoint = this.getWaterAnalysisEndpoint();
     if (!endpoint) {
-      this.showStatus('Configure HOMELLM_WATER_ANALYSIS_URL or HOMELLM_API_BASE_URL before uploading PDF lab reports.', 'error');
+      this.showStatus('Add an API base URL or analysis endpoint before uploading PDF lab reports.', 'error');
       return;
     }
 
@@ -955,6 +990,48 @@ class HomeLLMApp {
     };
   }
 
+  getWaterConfigStatus() {
+    const endpoint = this.getWaterAnalysisEndpoint();
+    const apiKey = (this.state.apiKey || '').trim();
+
+    if (endpoint && apiKey) {
+      return {
+        tone: 'ok',
+        message: 'PDF uploads analyze automatically via GPT-5.',
+        endpoint
+      };
+    }
+
+    if (!endpoint) {
+      return {
+        tone: 'warn',
+        message: 'Add an API base URL or water analysis endpoint to enable GPT-5 PDF uploads.',
+        endpoint: null
+      };
+    }
+
+    return {
+      tone: 'warn',
+      message: 'Add your model API key so GPT-5 can review uploaded PDFs.',
+      endpoint
+    };
+  }
+
+  updateWaterConfigIndicator() {
+    const indicator = this.root.querySelector('#waterConfigStatus');
+    if (!indicator) {
+      return;
+    }
+
+    const status = this.getWaterConfigStatus();
+    indicator.className = `water-config ${status.tone}`;
+    const parts = [`<span>${this.escape(status.message)}</span>`];
+    if (status.endpoint) {
+      parts.push(`<span class="water-config-endpoint">Endpoint: ${this.escape(status.endpoint)}</span>`);
+    }
+    indicator.innerHTML = parts.join('');
+  }
+
   formatEntriesAsText(entries) {
     if (!Array.isArray(entries) || !entries.length) {
       return '';
@@ -973,18 +1050,29 @@ class HomeLLMApp {
   }
 
   getWaterAnalysisEndpoint() {
+    const direct = this.state && typeof this.state.waterAnalysisUrl === 'string' ? this.state.waterAnalysisUrl.trim() : '';
+    if (direct) {
+      return direct;
+    }
+
+    const base = this.state && typeof this.state.apiBaseUrl === 'string' ? this.state.apiBaseUrl.trim() : '';
+    if (base) {
+      const sanitizedBase = base.replace(/\/$/, '');
+      return `${sanitizedBase}/water-analysis`;
+    }
+
     if (typeof window === 'undefined') {
       return null;
     }
 
     const global = window;
     if (global.HOMELLM_WATER_ANALYSIS_URL) {
-      return global.HOMELLM_WATER_ANALYSIS_URL;
+      return String(global.HOMELLM_WATER_ANALYSIS_URL).trim();
     }
 
     if (global.HOMELLM_API_BASE_URL) {
-      const base = global.HOMELLM_API_BASE_URL.replace(/\/$/, '');
-      return `${base}/water-analysis`;
+      const fallbackBase = String(global.HOMELLM_API_BASE_URL).trim().replace(/\/$/, '');
+      return `${fallbackBase}/water-analysis`;
     }
 
     return null;
