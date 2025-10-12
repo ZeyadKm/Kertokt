@@ -1,0 +1,48 @@
+{
+  "utility": "Denver Water",
+  "report_year": 2023,
+  "customer_support_url": "https://www.denverwater.org/your-water/water-quality",
+  "contaminants": [
+    {
+      "name": "Chromium (hexavalent)",
+      "level_ppb": 0.43,
+      "health_guideline_ppb": 0.02,
+      "legal_limit_ppb": 10.0,
+      "detected_in": "Distribution system"
+    },
+    {
+      "name": "Haloacetic acids (HAA5)",
+      "level_ppb": 18.2,
+      "health_guideline_ppb": 0.1,
+      "legal_limit_ppb": 60.0,
+      "detected_in": "Finished water"
+    },
+    {
+      "name": "Total trihalomethanes (TTHMs)",
+      "level_ppb": 42.0,
+      "health_guideline_ppb": 0.15,
+      "legal_limit_ppb": 80.0,
+      "detected_in": "Finished water"
+    }
+  ],
+  "programs": [
+    {
+      "name": "Lead Reduction Program",
+      "description": "Utility-funded lead service line replacement with free filter pitchers until completion.",
+      "category": "water-quality",
+      "estimated_value": 1200,
+      "enrollment_deadline": "2024-12-31",
+      "url": "https://www.denverwater.org/lead",
+      "status": "open",
+      "eligibility": "Homes built before 1951 in priority zones"
+    },
+    {
+      "name": "Conservation Kit",
+      "description": "Free water-saving kit with leak detection tablets and aerators.",
+      "category": "conservation",
+      "estimated_value": 75,
+      "url": "https://www.denverwater.org/watering-guide",
+      "status": "open"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "plans": [
+    {
+      "provider": "Shield Health",
+      "plan_name": "Household Wellness Plus",
+      "category": "health-insurance",
+      "benefits": [
+        {
+          "name": "Water filter reimbursement",
+          "description": "Get reimbursed for NSF-certified filters when medically necessary.",
+          "annual_value": 200,
+          "requirements": "Submit prescription and itemized receipt",
+          "contact_url": "https://shieldhealth.example.com/claims"
+        },
+        {
+          "name": "Home water testing",
+          "description": "Covers up to two certified lab tests per year when contaminants exceed guidelines.",
+          "annual_value": 180,
+          "requirements": "Provide EWG or utility exceedance report",
+          "contact_url": "https://shieldhealth.example.com/testing"
+        }
+      ]
+    },
+    {
+      "provider": "HomeSure Warranty",
+      "plan_name": "Essential Appliances",
+      "category": "home-warranty",
+      "benefits": [
+        {
+          "name": "Leak detection service",
+          "description": "Annual leak inspection including smart meter check and pipe survey.",
+          "annual_value": 150,
+          "requirements": "Schedule through portal"
+        }
+      ]
+    }
+  ]
+}
