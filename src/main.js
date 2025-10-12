@@ -42,6 +42,8 @@ class HomeLLMApp {
     this.attachments = [];
     this.activeTab = 'composer';
     this.generatedEmail = '';
+    this.pendingFocus = null;
+    this.statusTimer = null;
     this.sectionState = {
       findings: false,
       regulatory: false,
@@ -81,6 +83,7 @@ class HomeLLMApp {
     this.bindTabEvents();
     this.bindComposerEvents();
     this.bindDatasetEvents();
+    this.applyPendingFocus();
   }
 
   renderComposer() {
@@ -165,21 +168,23 @@ class HomeLLMApp {
               <textarea id="desiredOutcome" name="desiredOutcome" placeholder="Describe the fix, reimbursement, or response you need">${this.escape(
                 this.state.desiredOutcome
               )}</textarea>
-            </div>
-          </div>
-          <div class="field full-width">
-            <label for="concernSummary">What needs attention?</label>
-            <textarea id="concernSummary" name="concernSummary" placeholder="Summarize the primary risk or failure in 2-3 sentences">${this.escape(
-              this.state.concernSummary
-            )}</textarea>
           </div>
         </div>
+        <div class="field full-width">
+          <label for="concernSummary">What needs attention?</label>
+          <textarea id="concernSummary" name="concernSummary" placeholder="Summarize the primary risk or failure in 2-3 sentences">${this.escape(
+            this.state.concernSummary
+          )}</textarea>
+        </div>
+      </div>
 
-        ${this.state.issueType === 'water-quality' ? this.renderWaterAnalysisPanel() : ''}
+      ${this.state.issueType !== 'water-quality' ? this.renderWaterCallout() : ''}
 
-        <div class="panel collapsible">
-          <details data-section="findings" ${this.sectionState.findings ? 'open' : ''}>
-            <summary>Detailed Findings & Resident Impacts</summary>
+      ${this.state.issueType === 'water-quality' ? this.renderWaterAnalysisPanel() : ''}
+
+      <div class="panel collapsible">
+        <details data-section="findings" ${this.sectionState.findings ? 'open' : ''}>
+          <summary>Detailed Findings & Resident Impacts</summary>
             <div class="details-body">
               <div class="grid-two">
                 <div class="field">
@@ -347,16 +352,48 @@ class HomeLLMApp {
     `;
   }
 
+  renderWaterCallout() {
+    return `
+      <div class="panel water-cta">
+        <div class="water-cta-body">
+          <div>
+            <h3>Need to review a water lab report?</h3>
+            <p>Switch to the water quality workflow to upload CSVs, paste lab tables, and benchmark readings automatically.</p>
+          </div>
+          <div class="water-cta-actions">
+            <button type="button" id="activateWaterTools" class="btn btn-secondary">Show Water Analysis Tools</button>
+            <small>Instantly highlights EPA exceedances and copies a summary into your measurements field.</small>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   renderWaterAnalysisPanel() {
     const analysis = this.state.waterAnalysis;
     const hasData = analysis && Array.isArray(analysis.entries) && analysis.entries.length;
     const exceedanceCount = hasData ? analysis.exceedances.length : 0;
+    const summaryNote = analysis && analysis.summary ? `<div class="water-summary-note">${this.escape(analysis.summary)}</div>` : '';
+
+    const metadataLine = [];
+    if (analysis && analysis.model) {
+      metadataLine.push(`Model: ${this.escape(analysis.model)}`);
+    }
+    if (analysis && analysis.reviewedAt) {
+      const reviewedLabel = this.formatTimestamp(analysis.reviewedAt);
+      if (reviewedLabel) {
+        metadataLine.push(`Reviewed ${this.escape(reviewedLabel)}`);
+      }
+    }
+
     const rows = hasData
       ? analysis.entries
           .map((entry) => {
             const reference = entry.reference || findWaterStandard(entry.parameter) || null;
             const referenceText = reference
-              ? `${reference.thresholdLabel}: ${reference.mcl} ${reference.unit}`
+              ? reference.mcl !== null && reference.mcl !== undefined
+                ? `${reference.thresholdLabel}: ${reference.mcl}${reference.unit ? ` ${reference.unit}` : ''}`
+                : reference.thresholdLabel || 'Reference provided'
               : 'No reference matched';
             const statusLabel =
               entry.status === 'exceeds'
@@ -384,7 +421,7 @@ class HomeLLMApp {
             )
             .join('')}</ul>`
         : '<p class="water-good">All reported readings are within EPA reference limits.</p>'
-      : '<div class="water-placeholder">Upload or paste readings to summarize exceedances instantly.</div>';
+      : '<div class="water-placeholder">Upload or paste readings (CSV, JSON, text, or PDF) to summarize exceedances instantly.</div>';
 
     return `
       <div class="panel water-panel">
@@ -393,8 +430,9 @@ class HomeLLMApp {
         <div class="water-layout">
           <div class="water-inputs">
             <div class="field">
-              <label for="waterAnalysisFile">Upload Lab Report (.csv, .txt, .json)</label>
-              <input id="waterAnalysisFile" type="file" accept=".csv,.txt,.json" />
+              <label for="waterAnalysisFile">Upload Lab Report (.csv, .txt, .json, .pdf)</label>
+              <input id="waterAnalysisFile" type="file" accept=".csv,.txt,.json,.pdf,application/pdf" />
+              <small class="water-input-hint">PDF uploads are interpreted by GPT-5 using your configured API.</small>
             </div>
             <div class="field">
               <label for="waterAnalysisRaw">Paste table or readings</label>
@@ -419,6 +457,7 @@ class HomeLLMApp {
                   <div class="water-result-sub">${analysis.entries.length} parameter${
                     analysis.entries.length === 1 ? '' : 's'
                   } reviewed</div>
+                  ${metadataLine.length ? `<div class="water-result-meta">${metadataLine.join(' • ')}</div>` : ''}
                 </div>
                 <span class="status-chip ${exceedanceCount ? 'alert' : 'ok'}">${
                   exceedanceCount
@@ -426,6 +465,7 @@ class HomeLLMApp {
                     : 'Within limits'
                 }</span>
               </div>
+              ${summaryNote}
               ${highlight}
               <table class="water-table">
                 <thead>
@@ -555,6 +595,11 @@ class HomeLLMApp {
       });
     });
 
+    const activateWaterTools = composer.querySelector('#activateWaterTools');
+    if (activateWaterTools) {
+      activateWaterTools.addEventListener('click', () => this.activateWaterTools());
+    }
+
     composer.querySelectorAll('details[data-section]').forEach((details) => {
       details.addEventListener('toggle', (event) => {
         const section = event.target.dataset.section;
@@ -627,8 +672,14 @@ class HomeLLMApp {
   }
 
   handleWaterAnalysisUpload(event) {
-    const file = event.target.files && event.target.files[0];
+    const input = event.target;
+    const file = input.files && input.files[0];
     if (!file) {
+      return;
+    }
+
+    if (this.isPdfFile(file)) {
+      this.handleWaterPdfUpload(file, input);
       return;
     }
 
@@ -652,7 +703,291 @@ class HomeLLMApp {
       this.showStatus(`Upload failed: ${reader.error ? reader.error.message : 'Unknown error'}`, 'error');
     };
     reader.readAsText(file);
-    event.target.value = '';
+    if (input) {
+      input.value = '';
+    }
+  }
+
+  isPdfFile(file) {
+    if (!file) {
+      return false;
+    }
+
+    const type = (file.type || '').toLowerCase();
+    const name = (file.name || '').toLowerCase();
+    return type === 'application/pdf' || name.endsWith('.pdf');
+  }
+
+  handleWaterPdfUpload(file, inputElement) {
+    if (inputElement) {
+      inputElement.value = '';
+    }
+
+    const endpoint = this.getWaterAnalysisEndpoint();
+    if (!endpoint) {
+      this.showStatus('Configure HOMELLM_WATER_ANALYSIS_URL or HOMELLM_API_BASE_URL before uploading PDF lab reports.', 'error');
+      return;
+    }
+
+    const apiKey = (this.state.apiKey || '').trim();
+    if (!apiKey) {
+      this.showStatus('Add your GPT-5 API key to enable PDF water analysis.', 'error');
+      return;
+    }
+
+    this.showStatus(`Analyzing ${file.name} with GPT-5…`, 'progress');
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const result = typeof reader.result === 'string' ? reader.result : '';
+        const base64 = result.includes(',') ? result.split(',')[1] : result;
+        if (!base64) {
+          throw new Error('Unable to read PDF contents.');
+        }
+
+        const response = await this.requestWaterAnalysisFromApi({
+          fileName: file.name,
+          mimeType: file.type || 'application/pdf',
+          fileBase64: base64,
+          fileSize: file.size
+        });
+
+        const analysis = this.normalizeWaterAnalysisResponse(response, file.name);
+        this.state.waterAnalysis = analysis;
+        this.state.waterAnalysisRaw = analysis.rawText || this.formatEntriesAsText(analysis.entries);
+        this.sectionState.findings = true;
+        this.mergeWaterSummary(analysis);
+        this.render();
+        this.showStatus(`GPT-5 reviewed ${analysis.entries.length} reading(s) from ${file.name}.`, 'success');
+      } catch (error) {
+        this.showStatus(`GPT-5 analysis failed: ${error.message}`, 'error');
+      }
+    };
+
+    reader.onerror = () => {
+      this.showStatus(`Unable to read ${file.name}: ${reader.error ? reader.error.message : 'Unknown error'}`, 'error');
+    };
+
+    reader.readAsDataURL(file);
+  }
+
+  async requestWaterAnalysisFromApi(payload) {
+    const endpoint = this.getWaterAnalysisEndpoint();
+    if (!endpoint) {
+      throw new Error('Water analysis endpoint is not configured.');
+    }
+
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+
+    const apiKey = (this.state.apiKey || '').trim();
+    if (apiKey) {
+      headers.Authorization = `Bearer ${apiKey}`;
+    }
+
+    const body = {
+      model: 'gpt-5',
+      ...payload
+    };
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body)
+    });
+
+    const contentType = response.headers ? response.headers.get('content-type') || '' : '';
+    let data;
+
+    if (contentType.includes('application/json')) {
+      data = await response.json();
+    } else {
+      const text = await response.text();
+      try {
+        data = JSON.parse(text);
+      } catch (error) {
+        data = { rawText: text };
+      }
+    }
+
+    if (!response.ok) {
+      const message =
+        (data && (data.error || data.message)) || response.statusText || 'Water analysis request failed.';
+      throw new Error(message);
+    }
+
+    return data;
+  }
+
+  normalizeWaterAnalysisResponse(response, fileName) {
+    if (!response) {
+      throw new Error('Empty response from analysis service.');
+    }
+
+    const source = response.analysis && typeof response.analysis === 'object' ? response.analysis : response;
+    const rawCandidate =
+      source.rawText ||
+      source.raw ||
+      source.csv ||
+      source.tableText ||
+      response.rawText ||
+      response.csv ||
+      '';
+    const rawText = typeof rawCandidate === 'string' ? rawCandidate.trim() : '';
+
+    let entries = [];
+    const candidates = [source.entries, source.results, source.readings, source.parameters, source.table];
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate) && candidate.length) {
+        entries = candidate;
+        break;
+      }
+    }
+
+    if (!entries.length && typeof source.table === 'string') {
+      entries = this.extractEntriesFromText(source.table);
+    }
+
+    if (!entries.length && rawText) {
+      entries = this.extractEntriesFromText(rawText);
+    }
+
+    if (!entries.length) {
+      throw new Error('Analysis service returned no readings.');
+    }
+
+    const summaryCandidate = source.summary ?? response.summary ?? '';
+    const summary = typeof summaryCandidate === 'string' ? summaryCandidate.trim() : '';
+    let reviewedAt = source.reviewedAt || source.generatedAt || response.reviewedAt || null;
+    if (reviewedAt instanceof Date) {
+      reviewedAt = reviewedAt.toISOString();
+    } else if (typeof reviewedAt === 'number') {
+      reviewedAt = new Date(reviewedAt).toISOString();
+    }
+
+    const normalizedEntries = entries
+      .map((entry) => {
+        if (entry && entry.reference) {
+          entry.reference = this.normalizeReference(entry.reference);
+        }
+        if (entry && typeof entry.status === 'string') {
+          entry.status = entry.status.toLowerCase();
+        }
+        return this.normalizeWaterEntry(entry);
+      })
+      .filter(Boolean);
+
+    if (!normalizedEntries.length) {
+      throw new Error('No numeric readings detected in GPT-5 output.');
+    }
+
+    const exceedances = normalizedEntries.filter((entry) => entry.status === 'exceeds');
+
+    return {
+      fileName,
+      entries: normalizedEntries,
+      exceedances,
+      summary,
+      model: source.model || response.model || 'gpt-5',
+      reviewedAt,
+      rawText
+    };
+  }
+
+  normalizeReference(reference) {
+    if (!reference) {
+      return null;
+    }
+
+    if (typeof reference === 'string') {
+      const parsed = this.parseValueUnit(reference);
+      const normalizedLimit = Number.isFinite(parsed.number) ? Number(parsed.number.toFixed(4)) : null;
+      return {
+        label: reference,
+        thresholdLabel: reference,
+        mcl: normalizedLimit,
+        unit: parsed.unit || ''
+      };
+    }
+
+    if (typeof reference !== 'object') {
+      return null;
+    }
+
+    const label = reference.thresholdLabel || reference.label || reference.name || reference.title || 'Reference limit';
+    const limitSource =
+      reference.mcl ??
+      reference.limit ??
+      reference.maximum ??
+      reference.max ??
+      reference.threshold ??
+      reference.value ??
+      null;
+
+    let unit = reference.unit || reference.units || reference.measure || '';
+    let limitNumber = Number.isFinite(limitSource) ? Number(limitSource) : NaN;
+
+    if (!Number.isFinite(limitNumber) && typeof limitSource === 'string') {
+      const parsed = this.parseValueUnit(limitSource);
+      limitNumber = parsed.number;
+      if (!unit && parsed.unit) {
+        unit = parsed.unit;
+      }
+    }
+
+    if (!Number.isFinite(limitNumber) && typeof reference.value === 'string') {
+      const parsed = this.parseValueUnit(reference.value);
+      limitNumber = parsed.number;
+      if (!unit && parsed.unit) {
+        unit = parsed.unit;
+      }
+    }
+
+    const normalizedLimit = Number.isFinite(limitNumber) ? Number(limitNumber.toFixed(4)) : null;
+
+    return {
+      label,
+      thresholdLabel: reference.thresholdLabel || label,
+      mcl: normalizedLimit,
+      unit
+    };
+  }
+
+  formatEntriesAsText(entries) {
+    if (!Array.isArray(entries) || !entries.length) {
+      return '';
+    }
+
+    const header = 'Parameter,Value,Unit,Status';
+    const rows = entries.map((entry) => {
+      const parameter = entry.parameter || '';
+      const value = Number.isFinite(entry.value) ? entry.value : entry.value || '';
+      const status = entry.status || '';
+      const unit = entry.unit || '';
+      return `${String(parameter)},${String(value)},${String(unit)},${String(status)}`;
+    });
+
+    return [header].concat(rows).join('\n');
+  }
+
+  getWaterAnalysisEndpoint() {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    const global = window;
+    if (global.HOMELLM_WATER_ANALYSIS_URL) {
+      return global.HOMELLM_WATER_ANALYSIS_URL;
+    }
+
+    if (global.HOMELLM_API_BASE_URL) {
+      const base = global.HOMELLM_API_BASE_URL.replace(/\/$/, '');
+      return `${base}/water-analysis`;
+    }
+
+    return null;
   }
 
   analyzeWaterText() {
@@ -841,9 +1176,35 @@ class HomeLLMApp {
     }
 
     const roundedValue = Number(numericValue.toFixed(4));
-    const reference = findWaterStandard(parameter);
+    const standard = findWaterStandard(parameter);
+
+    let reference = null;
+    if (entry.reference) {
+      reference = this.normalizeReference(entry.reference);
+    }
+
+    if (reference && standard) {
+      reference = {
+        label: reference.label || standard.label,
+        thresholdLabel: reference.thresholdLabel || reference.label || standard.thresholdLabel,
+        mcl: Number.isFinite(reference.mcl) ? reference.mcl : standard.mcl,
+        unit: reference.unit || standard.unit
+      };
+    } else if (!reference && standard) {
+      reference = {
+        label: standard.label,
+        thresholdLabel: standard.thresholdLabel,
+        mcl: standard.mcl,
+        unit: standard.unit
+      };
+    }
+
+    const providedStatus = entry.status && typeof entry.status === 'string' ? entry.status.toLowerCase() : null;
+    const statusOptions = ['exceeds', 'within', 'unknown'];
     const status =
-      reference && Number.isFinite(roundedValue)
+      providedStatus && statusOptions.includes(providedStatus)
+        ? providedStatus
+        : reference && Number.isFinite(reference.mcl)
         ? roundedValue > reference.mcl
           ? 'exceeds'
           : 'within'
@@ -854,14 +1215,7 @@ class HomeLLMApp {
       value: roundedValue,
       unit,
       status,
-      reference: reference
-        ? {
-            label: reference.label,
-            mcl: reference.mcl,
-            unit: reference.unit,
-            thresholdLabel: reference.thresholdLabel
-          }
-        : null
+      reference
     };
   }
 
@@ -900,20 +1254,52 @@ class HomeLLMApp {
     return `${entry.value}${entry.unit ? ` ${entry.unit}` : ''}`.trim();
   }
 
+  formatTimestamp(value) {
+    if (!value) {
+      return '';
+    }
+
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return String(value);
+    }
+
+    return date.toLocaleString(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    });
+  }
+
   mergeWaterSummary(analysis) {
     if (!analysis || !analysis.entries || !analysis.entries.length) {
       return;
     }
 
-    const summaryLines = analysis.entries.map((entry) => {
+    const summaryLines = [];
+
+    if (analysis.summary) {
+      summaryLines.push(`Summary – ${analysis.summary}`);
+    }
+
+    analysis.entries.forEach((entry) => {
       const indicator = entry.status === 'exceeds' ? '⚠️' : '•';
-      const reference = entry.reference
-        ? `${entry.reference.thresholdLabel} ${entry.reference.mcl} ${entry.reference.unit}`
-        : 'no reference benchmark';
-      return `${indicator} ${entry.parameter}: ${this.formatWaterValue(entry)} (${reference})`;
+      let referenceText = 'no reference benchmark';
+      if (entry.reference) {
+        const hasMcl = entry.reference.mcl !== null && entry.reference.mcl !== undefined;
+        const unitPart = entry.reference.unit ? ` ${entry.reference.unit}` : '';
+        referenceText = hasMcl
+          ? `${entry.reference.thresholdLabel} ${entry.reference.mcl}${unitPart}`
+          : entry.reference.thresholdLabel || 'reference provided';
+      }
+      summaryLines.push(`${indicator} ${entry.parameter}: ${this.formatWaterValue(entry)} (${referenceText})`);
     });
 
-    const summaryText = `Water analysis${analysis.fileName ? ` from ${analysis.fileName}` : ''}: ${summaryLines.join('; ')}`;
+    const descriptor = [`Water analysis${analysis.fileName ? ` from ${analysis.fileName}` : ''}`];
+    if (analysis.model) {
+      descriptor.push(`via ${analysis.model}`);
+    }
+
+    const summaryText = `${descriptor.join(' ')}: ${summaryLines.join('; ')}`;
 
     if (this.state.measurements && this.state.measurements.trim().length) {
       if (!this.state.measurements.includes(summaryText)) {
@@ -933,6 +1319,14 @@ class HomeLLMApp {
     this.state.waterAnalysisRaw = '';
     this.render();
     this.showStatus('Cleared water analysis data.', 'success');
+  }
+
+  activateWaterTools() {
+    this.state.issueType = 'water-quality';
+    this.sectionState.findings = true;
+    this.pendingFocus = '#waterAnalysisFile';
+    this.render();
+    this.showStatus('Water quality tools ready – upload a file or paste your readings.', 'success');
   }
 
   handleGenerate() {
@@ -983,13 +1377,51 @@ class HomeLLMApp {
     }
   }
 
-  showStatus(message, type) {
+  showStatus(message, type = 'success') {
     const statusArea = this.root.querySelector('#statusArea');
     if (!statusArea) return;
-    statusArea.innerHTML = `<div class="status ${type === 'error' ? 'error' : ''}">${message}</div>`;
-    setTimeout(() => {
-      if (statusArea) statusArea.innerHTML = '';
-    }, 4000);
+
+    if (this.statusTimer) {
+      clearTimeout(this.statusTimer);
+      this.statusTimer = null;
+    }
+
+    const classes = ['status'];
+    if (type === 'error') {
+      classes.push('error');
+    } else if (type === 'progress') {
+      classes.push('progress');
+    }
+
+    statusArea.innerHTML = `<div class="${classes.join(' ')}">${this.escape(message)}</div>`;
+
+    if (type !== 'progress') {
+      this.statusTimer = setTimeout(() => {
+        if (statusArea) {
+          statusArea.innerHTML = '';
+        }
+        this.statusTimer = null;
+      }, 4000);
+    }
+  }
+
+  applyPendingFocus() {
+    if (!this.pendingFocus) {
+      return;
+    }
+
+    const target = this.root.querySelector(this.pendingFocus);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (typeof target.focus === 'function') {
+        try {
+          target.focus({ preventScroll: true });
+        } catch (error) {
+          target.focus();
+        }
+      }
+    }
+    this.pendingFocus = null;
   }
 
   escape(value) {
