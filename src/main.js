@@ -42,6 +42,7 @@ class HomeLLMApp {
     this.attachments = [];
     this.activeTab = 'composer';
     this.generatedEmail = '';
+    this.pendingFocus = null;
     this.sectionState = {
       findings: false,
       regulatory: false,
@@ -81,6 +82,7 @@ class HomeLLMApp {
     this.bindTabEvents();
     this.bindComposerEvents();
     this.bindDatasetEvents();
+    this.applyPendingFocus();
   }
 
   renderComposer() {
@@ -165,21 +167,23 @@ class HomeLLMApp {
               <textarea id="desiredOutcome" name="desiredOutcome" placeholder="Describe the fix, reimbursement, or response you need">${this.escape(
                 this.state.desiredOutcome
               )}</textarea>
-            </div>
-          </div>
-          <div class="field full-width">
-            <label for="concernSummary">What needs attention?</label>
-            <textarea id="concernSummary" name="concernSummary" placeholder="Summarize the primary risk or failure in 2-3 sentences">${this.escape(
-              this.state.concernSummary
-            )}</textarea>
           </div>
         </div>
+        <div class="field full-width">
+          <label for="concernSummary">What needs attention?</label>
+          <textarea id="concernSummary" name="concernSummary" placeholder="Summarize the primary risk or failure in 2-3 sentences">${this.escape(
+            this.state.concernSummary
+          )}</textarea>
+        </div>
+      </div>
 
-        ${this.state.issueType === 'water-quality' ? this.renderWaterAnalysisPanel() : ''}
+      ${this.state.issueType !== 'water-quality' ? this.renderWaterCallout() : ''}
 
-        <div class="panel collapsible">
-          <details data-section="findings" ${this.sectionState.findings ? 'open' : ''}>
-            <summary>Detailed Findings & Resident Impacts</summary>
+      ${this.state.issueType === 'water-quality' ? this.renderWaterAnalysisPanel() : ''}
+
+      <div class="panel collapsible">
+        <details data-section="findings" ${this.sectionState.findings ? 'open' : ''}>
+          <summary>Detailed Findings & Resident Impacts</summary>
             <div class="details-body">
               <div class="grid-two">
                 <div class="field">
@@ -342,6 +346,23 @@ class HomeLLMApp {
             )}</textarea>
           </div>
           <div id="statusArea"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  renderWaterCallout() {
+    return `
+      <div class="panel water-cta">
+        <div class="water-cta-body">
+          <div>
+            <h3>Need to review a water lab report?</h3>
+            <p>Switch to the water quality workflow to upload CSVs, paste lab tables, and benchmark readings automatically.</p>
+          </div>
+          <div class="water-cta-actions">
+            <button type="button" id="activateWaterTools" class="btn btn-secondary">Show Water Analysis Tools</button>
+            <small>Instantly highlights EPA exceedances and copies a summary into your measurements field.</small>
+          </div>
         </div>
       </div>
     `;
@@ -554,6 +575,11 @@ class HomeLLMApp {
         }
       });
     });
+
+    const activateWaterTools = composer.querySelector('#activateWaterTools');
+    if (activateWaterTools) {
+      activateWaterTools.addEventListener('click', () => this.activateWaterTools());
+    }
 
     composer.querySelectorAll('details[data-section]').forEach((details) => {
       details.addEventListener('toggle', (event) => {
@@ -935,6 +961,14 @@ class HomeLLMApp {
     this.showStatus('Cleared water analysis data.', 'success');
   }
 
+  activateWaterTools() {
+    this.state.issueType = 'water-quality';
+    this.sectionState.findings = true;
+    this.pendingFocus = '#waterAnalysisFile';
+    this.render();
+    this.showStatus('Water quality tools ready – upload a file or paste your readings.', 'success');
+  }
+
   handleGenerate() {
     const { subject, body } = buildEmail(this.state, this.attachments);
     this.generatedEmail = `Subject: ${subject}\n\n${body}`;
@@ -990,6 +1024,25 @@ class HomeLLMApp {
     setTimeout(() => {
       if (statusArea) statusArea.innerHTML = '';
     }, 4000);
+  }
+
+  applyPendingFocus() {
+    if (!this.pendingFocus) {
+      return;
+    }
+
+    const target = this.root.querySelector(this.pendingFocus);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (typeof target.focus === 'function') {
+        try {
+          target.focus({ preventScroll: true });
+        } catch (error) {
+          target.focus();
+        }
+      }
+    }
+    this.pendingFocus = null;
   }
 
   escape(value) {
